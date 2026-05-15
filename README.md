@@ -1,4 +1,4 @@
-# An MCP-based Chatbot
+# Mio
 
 (English | [中文](README_zh.md) | [日本語](README_ja.md))
 
@@ -8,17 +8,17 @@
 
 👉 [Handcraft your AI girlfriend, beginner's guide【bilibili】](https://www.bilibili.com/video/BV1XnmFYLEJN/)
 
-As a voice interaction entry, the XiaoZhi AI chatbot leverages the AI capabilities of large models like Qwen / DeepSeek, and achieves multi-terminal control via the MCP protocol.
+Mio is an ESP32-based voice interaction firmware focused on MCP-connected AI experiences, streaming audio playback, and custom board adaptation.
+
+This repository is maintained as an independent development line based on the original XiaoZhi project, with current work centered on ES8311 audio hardware, streaming media playback, and board-level customization.
 
 <img src="docs/mcp-based-graph.jpg" alt="Control everything via MCP" width="320">
 
-## Version Notes
+## Project Notes
 
-The current v2 version is incompatible with the v1 partition table, so it is not possible to upgrade from v1 to v2 via OTA. For partition table details, see [partitions/v2/README.md](partitions/v2/README.md).
+The current codebase still inherits part of the original project structure, including board support, partition layout, and MCP-related capabilities.
 
-All hardware running v1 can be upgraded to v2 by manually flashing the firmware.
-
-The stable version of v1 is 1.9.2. You can switch to v1 by running `git checkout v1`. The v1 branch will be maintained until February 2026.
+For board-specific and partition-related details, see [partitions/v2/README.md](partitions/v2/README.md).
 
 ### Features Implemented
 
