@@ -1,4 +1,4 @@
-# An MCP-based Chatbot
+# Mio
 
 （中文 | [English](README.md) | [日本語](README_ja.md)）
 
@@ -12,13 +12,13 @@
 
 <img src="docs/mcp-based-graph.jpg" alt="通过MCP控制万物" width="320">
 
-### 版本说明
+### 项目说明
 
-当前 v2 版本与 v1 版本分区表不兼容，所以无法从 v1 版本通过 OTA 升级到 v2 版本。分区表说明参见 [partitions/v2/README.md](partitions/v2/README.md)。
+Mio 是一个基于 ESP32 的语音交互固件项目，面向 MCP 连接的 AI 体验、流媒体音频播放和自定义硬件适配。
 
-使用 v1 版本的所有硬件，可以通过手动烧录固件来升级到 v2 版本。
+这个仓库是在原始小智项目基础上独立维护的开发分支，当前重点放在 ES8311 音频硬件、流媒体播放能力以及板级定制上。
 
-v1 的稳定版本为 1.9.2，可以通过 `git checkout v1` 来切换到 v1 版本，该分支会持续维护到 2026 年 2 月。
+关于分区和板级结构的说明，可参考 [partitions/v2/README.md](partitions/v2/README.md)。
 
 ### 已实现功能
 
