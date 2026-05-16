@@ -1181,6 +1181,7 @@ void Application::PlayAudioUrl(const std::string& url, const std::string& song_n
         });
     }
 
+    aborted_ = false;
     media_streaming_.store(true);
     Schedule([this]() {
         if (GetDeviceState() != kDeviceStateSpeaking) {
@@ -1200,7 +1201,11 @@ void Application::PlayAudioUrl(const std::string& url, const std::string& song_n
             media_streaming_.store(false);
             Schedule([this]() {
                 if (GetDeviceState() == kDeviceStateSpeaking) {
-                    SetDeviceState(kDeviceStateListening);
+                    if (listening_mode_ == kListeningModeManualStop) {
+                        SetDeviceState(kDeviceStateIdle);
+                    } else {
+                        SetDeviceState(kDeviceStateListening);
+                    }
                 }
             });
             return;
@@ -1218,7 +1223,11 @@ void Application::PlayAudioUrl(const std::string& url, const std::string& song_n
             media_streaming_.store(false);
             Schedule([this]() {
                 if (GetDeviceState() == kDeviceStateSpeaking) {
-                    SetDeviceState(kDeviceStateListening);
+                    if (listening_mode_ == kListeningModeManualStop) {
+                        SetDeviceState(kDeviceStateIdle);
+                    } else {
+                        SetDeviceState(kDeviceStateListening);
+                    }
                 }
             });
             return;
@@ -1251,10 +1260,24 @@ void Application::PlayAudioUrl(const std::string& url, const std::string& song_n
             }
         }
         http->Close();
-        media_streaming_.store(false);
+
+        // Keep the media session active until all queued audio has been played.
+        if (media_streaming_.load()) {
+            audio_service_.WaitForPlaybackQueueEmpty();
+        }
+
+        bool playback_completed = media_streaming_.exchange(false);
+        if (!playback_completed) {
+            return;
+        }
+
         Schedule([this]() {
             if (GetDeviceState() == kDeviceStateSpeaking) {
-                SetDeviceState(kDeviceStateListening);
+                if (listening_mode_ == kListeningModeManualStop) {
+                    SetDeviceState(kDeviceStateIdle);
+                } else {
+                    SetDeviceState(kDeviceStateListening);
+                }
             }
         });
     }).detach();
