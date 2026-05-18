@@ -126,12 +126,16 @@ private:
             }
             app.ToggleChatState();
         });
-        touch_button_.OnPressDown([this]() {
-            Application::GetInstance().StartListening();
-        });
-        touch_button_.OnPressUp([this]() {
-            Application::GetInstance().StopListening();
-        });
+        // Disable touch-triggered listening for now. On the current hardware this
+        // line is unstable during boot and can push the app into listening state
+        // immediately, which in turn keeps feeding AFE and floods the log.
+        // Re-enable after the touch input circuit and polarity are verified.
+        // touch_button_.OnPressDown([this]() {
+        //     Application::GetInstance().StartListening();
+        // });
+        // touch_button_.OnPressUp([this]() {
+        //     Application::GetInstance().StopListening();
+        // });
 
         volume_up_button_.OnClick([this]() {
             auto codec = GetAudioCodec();
