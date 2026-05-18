@@ -1,4 +1,5 @@
 #include "audio_service.h"
+#include "config.h"
 #include <esp_log.h>
 #include <cstring>
 
@@ -36,6 +37,10 @@
 #endif
 
 #define TAG "AudioService"
+
+#ifndef AUDIO_MICROPHONE_ENABLED
+#define AUDIO_MICROPHONE_ENABLED 1
+#endif
 
 AudioService::AudioService() {
     event_group_ = xEventGroupCreate();
@@ -182,6 +187,10 @@ void AudioService::Stop() {
 }
 
 bool AudioService::ReadAudioData(std::vector<int16_t>& data, int sample_rate, int samples) {
+#if !AUDIO_MICROPHONE_ENABLED
+    return false;
+#endif
+
     if (!codec_->input_enabled()) {
         esp_timer_stop(audio_power_timer_);
         esp_timer_start_periodic(audio_power_timer_, AUDIO_POWER_CHECK_INTERVAL_MS * 1000);

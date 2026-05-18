@@ -17,7 +17,8 @@
 #define AUDIO_CODEC_I2C_SCL_PIN  GPIO_NUM_17
 #define AUDIO_CODEC_ES8311_ADDR  ES8311_CODEC_DEFAULT_ADDR
 
-
+// Set to 1 after the microphone input path is installed and validated.
+#define AUDIO_MICROPHONE_ENABLED 0
 
 #define BUILTIN_LED_GPIO        GPIO_NUM_48
 #define BOOT_BUTTON_GPIO        GPIO_NUM_0

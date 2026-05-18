@@ -88,6 +88,7 @@ set(EMOTE_RESOLUTION "320_240")
 set(BOARD_TYPE "bread-compact-wifi")
 set(BUILTIN_TEXT_FONT font_puhui_basic_14_1)
 set(BUILTIN_ICON_FONT font_awesome_14_1)
+list(APPEND INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_TYPE})
 
 if(MANUFACTURER)
     file(GLOB BOARD_SOURCES
