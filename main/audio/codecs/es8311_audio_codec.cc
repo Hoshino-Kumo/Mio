@@ -1,27 +1,9 @@
 #include "es8311_audio_codec.h"
-#include "config.h"
 
 #include <esp_err.h>
 #include <esp_log.h>
-#include <esp_timer.h>
 
 #define TAG "Es8311AudioCodec"
-
-#ifndef AUDIO_CODEC_INPUT_GAIN_DB
-#define AUDIO_CODEC_INPUT_GAIN_DB 30
-#endif
-
-#ifndef AUDIO_CODEC_INPUT_I2S_CHANNELS
-#define AUDIO_CODEC_INPUT_I2S_CHANNELS 1
-#endif
-
-#ifndef AUDIO_CODEC_INPUT_CHANNEL_MASK
-#define AUDIO_CODEC_INPUT_CHANNEL_MASK 0
-#endif
-
-#ifndef AUDIO_CODEC_I2S_BITS_PER_SAMPLE
-#define AUDIO_CODEC_I2S_BITS_PER_SAMPLE 16
-#endif
 
 Es8311AudioCodec::Es8311AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port, int input_sample_rate, int output_sample_rate,
     gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din,
@@ -33,7 +15,7 @@ Es8311AudioCodec::Es8311AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port,
     output_sample_rate_ = output_sample_rate;
     pa_pin_ = pa_pin;
     pa_inverted_ = pa_inverted;
-    input_gain_ = AUDIO_CODEC_INPUT_GAIN_DB;
+    input_gain_ = 30;
 
     assert(input_sample_rate_ == output_sample_rate_);
     CreateDuplexChannels(mclk, bclk, ws, dout, din);
@@ -65,7 +47,6 @@ Es8311AudioCodec::Es8311AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port,
     es8311_cfg.codec_mode = ESP_CODEC_DEV_WORK_MODE_BOTH;
     es8311_cfg.pa_pin = pa_pin;
     es8311_cfg.use_mclk = use_mclk;
-    es8311_cfg.no_dac_ref = true;
     es8311_cfg.hw_gain.pa_voltage = 5.0;
     es8311_cfg.hw_gain.codec_dac_voltage = 3.3;
     es8311_cfg.pa_reverted = pa_inverted_;
@@ -98,15 +79,12 @@ void Es8311AudioCodec::UpdateDeviceState() {
         assert(dev_ != NULL);
 
         esp_codec_dev_sample_info_t fs = {
-            .bits_per_sample = AUDIO_CODEC_I2S_BITS_PER_SAMPLE,
-            .channel = AUDIO_CODEC_INPUT_I2S_CHANNELS,
-            .channel_mask = AUDIO_CODEC_INPUT_CHANNEL_MASK,
+            .bits_per_sample = 16,
+            .channel = 1,
+            .channel_mask = 0,
             .sample_rate = (uint32_t)input_sample_rate_,
             .mclk_multiple = 0,
         };
-        ESP_LOGI(TAG, "Open ES8311: sample_rate=%d, i2s_bits=%d, i2s_channels=%d, channel_mask=0x%x, input_gain=%.1f dB",
-                 input_sample_rate_, AUDIO_CODEC_I2S_BITS_PER_SAMPLE, AUDIO_CODEC_INPUT_I2S_CHANNELS,
-                 AUDIO_CODEC_INPUT_CHANNEL_MASK, input_gain_);
         ESP_ERROR_CHECK(esp_codec_dev_open(dev_, &fs));
         ESP_ERROR_CHECK(esp_codec_dev_set_in_gain(dev_, input_gain_));
         ESP_ERROR_CHECK(esp_codec_dev_set_out_vol(dev_, output_volume_));
@@ -118,95 +96,6 @@ void Es8311AudioCodec::UpdateDeviceState() {
         int level = output_enabled_ ? 1 : 0;
         gpio_set_level(pa_pin_, pa_inverted_ ? !level : level);
     }
-}
-
-void Es8311AudioCodec::LogDiagnostics(const int16_t* data, int samples, const int32_t* raw32) {
-    int64_t now = esp_timer_get_time();
-    if (now - last_diagnostic_log_time_ < 5000000) {
-        return;
-    }
-    last_diagnostic_log_time_ = now;
-
-    int32_t peak = 0;
-    for (int i = 0; i < samples; ++i) {
-        int32_t value = data[i];
-        int32_t abs_value = value < 0 ? -value : value;
-        if (abs_value > peak) {
-            peak = abs_value;
-        }
-    }
-
-    int reg_fd = 0;
-    int reg_fe = 0;
-    int reg_ff = 0;
-    int reg_01 = 0;
-    int reg_09 = 0;
-    int reg_0a = 0;
-    int reg_0d = 0;
-    int reg_0e = 0;
-    int reg_12 = 0;
-    int reg_14 = 0;
-    int reg_15 = 0;
-    int reg_16 = 0;
-    int reg_17 = 0;
-    int reg_32 = 0;
-    int reg_44 = 0;
-
-    esp_codec_dev_read_reg(dev_, 0xfd, &reg_fd);
-    esp_codec_dev_read_reg(dev_, 0xfe, &reg_fe);
-    esp_codec_dev_read_reg(dev_, 0xff, &reg_ff);
-    esp_codec_dev_read_reg(dev_, 0x01, &reg_01);
-    esp_codec_dev_read_reg(dev_, 0x09, &reg_09);
-    esp_codec_dev_read_reg(dev_, 0x0a, &reg_0a);
-    esp_codec_dev_read_reg(dev_, 0x0d, &reg_0d);
-    esp_codec_dev_read_reg(dev_, 0x0e, &reg_0e);
-    esp_codec_dev_read_reg(dev_, 0x12, &reg_12);
-    esp_codec_dev_read_reg(dev_, 0x14, &reg_14);
-    esp_codec_dev_read_reg(dev_, 0x15, &reg_15);
-    esp_codec_dev_read_reg(dev_, 0x16, &reg_16);
-    esp_codec_dev_read_reg(dev_, 0x17, &reg_17);
-    esp_codec_dev_read_reg(dev_, 0x32, &reg_32);
-    esp_codec_dev_read_reg(dev_, 0x44, &reg_44);
-
-    if (raw32 != nullptr) {
-        int32_t raw_peak = 0;
-        int32_t high16_peak = 0;
-        int32_t mid16_peak = 0;
-        for (int i = 0; i < samples; ++i) {
-            int32_t value = raw32[i];
-            int32_t raw_abs = value < 0 ? -value : value;
-            if (raw_abs > raw_peak) {
-                raw_peak = raw_abs;
-            }
-            int32_t high16 = value >> 16;
-            int32_t high16_abs = high16 < 0 ? -high16 : high16;
-            if (high16_abs > high16_peak) {
-                high16_peak = high16_abs;
-            }
-            int32_t mid16 = value >> 8;
-            int32_t mid16_abs = mid16 < 0 ? -mid16 : mid16;
-            if (mid16_abs > mid16_peak) {
-                mid16_peak = mid16_abs;
-            }
-        }
-        ESP_LOGI(TAG, "ES8311 diag: id=%02x/%02x/%02x clk01=%02x sdp09=%02x sdp0a=%02x pwr0d=%02x pwr0e=%02x dac12=%02x sys14=%02x adc15=%02x gain16=%02x vol17=%02x dac32=%02x gpio44=%02x pcm_peak=%ld raw32_peak=%ld high16_peak=%ld mid16_peak=%ld pcm_first=[%d,%d,%d,%d] raw32_first=[%ld,%ld,%ld,%ld]",
-                 reg_fd, reg_fe, reg_ff, reg_01, reg_09, reg_0a, reg_0d, reg_0e, reg_12,
-                 reg_14, reg_15, reg_16, reg_17, reg_32, reg_44, static_cast<long>(peak),
-                 static_cast<long>(raw_peak), static_cast<long>(high16_peak), static_cast<long>(mid16_peak),
-                 samples > 0 ? data[0] : 0, samples > 1 ? data[1] : 0,
-                 samples > 2 ? data[2] : 0, samples > 3 ? data[3] : 0,
-                 samples > 0 ? static_cast<long>(raw32[0]) : 0, samples > 1 ? static_cast<long>(raw32[1]) : 0,
-                 samples > 2 ? static_cast<long>(raw32[2]) : 0, samples > 3 ? static_cast<long>(raw32[3]) : 0);
-        return;
-    }
-
-    ESP_LOGI(TAG, "ES8311 diag: id=%02x/%02x/%02x clk01=%02x sdp09=%02x sdp0a=%02x pwr0d=%02x pwr0e=%02x dac12=%02x sys14=%02x adc15=%02x gain16=%02x vol17=%02x dac32=%02x gpio44=%02x pcm_peak=%ld pcm_first=[%d,%d,%d,%d,%d,%d,%d,%d]",
-             reg_fd, reg_fe, reg_ff, reg_01, reg_09, reg_0a, reg_0d, reg_0e, reg_12,
-             reg_14, reg_15, reg_16, reg_17, reg_32, reg_44, static_cast<long>(peak),
-             samples > 0 ? data[0] : 0, samples > 1 ? data[1] : 0,
-             samples > 2 ? data[2] : 0, samples > 3 ? data[3] : 0,
-             samples > 4 ? data[4] : 0, samples > 5 ? data[5] : 0,
-             samples > 6 ? data[6] : 0, samples > 7 ? data[7] : 0);
 }
 
 void Es8311AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din) {
@@ -301,40 +190,17 @@ int Es8311AudioCodec::Read(int16_t* dest, int samples) {
         return 0;
     }
 
-#if AUDIO_CODEC_I2S_BITS_PER_SAMPLE > 16
-    std::vector<int32_t> raw(samples);
-    auto ret = esp_codec_dev_read(dev_, raw.data(), samples * sizeof(int32_t));
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to read input data: %s", esp_err_to_name(ret));
-        return 0;
-    }
-    for (int i = 0; i < samples; ++i) {
-        dest[i] = static_cast<int16_t>(raw[i] >> 16);
-    }
-    LogDiagnostics(dest, samples, raw.data());
-    return samples;
-#else
     auto ret = esp_codec_dev_read(dev_, (void*)dest, samples * sizeof(int16_t));
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "Failed to read input data: %s", esp_err_to_name(ret));
         return 0;
     }
-    LogDiagnostics(dest, samples);
     return samples;
-#endif
 }
 
 int Es8311AudioCodec::Write(const int16_t* data, int samples) {
     if (output_enabled_) {
-#if AUDIO_CODEC_I2S_BITS_PER_SAMPLE > 16
-        std::vector<int32_t> raw(samples);
-        for (int i = 0; i < samples; ++i) {
-            raw[i] = static_cast<int32_t>(data[i]) << 16;
-        }
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_write(dev_, raw.data(), samples * sizeof(int32_t)));
-#else
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_write(dev_, (void*)data, samples * sizeof(int16_t)));
-#endif
     }
     return samples;
 }

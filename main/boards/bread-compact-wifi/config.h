@@ -19,11 +19,6 @@
 
 // ES8311 microphone input path is enabled for validation.
 #define AUDIO_MICROPHONE_ENABLED 1
-#define AUDIO_CODEC_INPUT_GAIN_DB 42
-#define AUDIO_CODEC_I2S_BITS_PER_SAMPLE 16
-// ES8311 is physically mono; sample the ADC data from the left slot.
-#define AUDIO_CODEC_INPUT_I2S_CHANNELS 2
-#define AUDIO_CODEC_INPUT_CHANNEL_MASK ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0)
 
 #define BUILTIN_LED_GPIO        GPIO_NUM_48
 #define BOOT_BUTTON_GPIO        GPIO_NUM_0
@@ -39,8 +34,6 @@
 #define LCD_RST_PIN        GPIO_NUM_8
 // Schematic net: IO4 -> PWM -> Q_BL -> LCD_BL_K.
 #define LCD_BACKLIGHT_PIN  GPIO_NUM_4
-#define LCD_BACKLIGHT_OUTPUT_INVERT false
-#define LCD_BACKLIGHT_DEFAULT_BRIGHTNESS 100
 #define LCD_PIXEL_CLOCK_HZ (40 * 1000 * 1000)
 
 #define DISPLAY_WIDTH        240

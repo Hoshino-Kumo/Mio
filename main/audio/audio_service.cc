@@ -225,25 +225,6 @@ bool AudioService::ReadAudioData(std::vector<int16_t>& data, int sample_rate, in
     last_input_time_ = std::chrono::steady_clock::now();
     debug_statistics_.input_count++;
 
-    auto now = last_input_time_;
-    if (last_input_debug_time_.time_since_epoch().count() == 0 ||
-        std::chrono::duration_cast<std::chrono::milliseconds>(now - last_input_debug_time_).count() >= 2000) {
-        int32_t peak = 0;
-        int64_t sum_abs = 0;
-        for (auto sample : data) {
-            int32_t value = sample;
-            int32_t abs_value = value < 0 ? -value : value;
-            if (abs_value > peak) {
-                peak = abs_value;
-            }
-            sum_abs += abs_value;
-        }
-        int32_t avg_abs = data.empty() ? 0 : static_cast<int32_t>(sum_abs / data.size());
-        ESP_LOGI(TAG, "Mic input samples=%u peak=%ld avg_abs=%ld",
-                 static_cast<unsigned>(data.size()), static_cast<long>(peak), static_cast<long>(avg_abs));
-        last_input_debug_time_ = now;
-    }
-
 #if CONFIG_USE_AUDIO_DEBUGGER
     // 音频调试：发送原始音频数据
     if (audio_debugger_ == nullptr) {
@@ -659,7 +640,6 @@ void AudioService::SetCallbacks(AudioServiceCallbacks& callbacks) {
 }
 
 void AudioService::PlaySound(const std::string_view& ogg) {
-    ESP_LOGI(TAG, "Play sound: %u bytes", static_cast<unsigned>(ogg.size()));
     if (!codec_->output_enabled()) {
         esp_timer_stop(audio_power_timer_);
         esp_timer_start_periodic(audio_power_timer_, AUDIO_POWER_CHECK_INTERVAL_MS * 1000);
@@ -680,40 +660,6 @@ void AudioService::PlaySound(const std::string_view& ogg) {
     });
     demuxer->Reset();
     demuxer->Process(buf, size);
-}
-
-void AudioService::PlayDiagnosticTone(int frequency_hz, int duration_ms, int amplitude) {
-    if (codec_ == nullptr || frequency_hz <= 0 || duration_ms <= 0 || amplitude <= 0) {
-        return;
-    }
-    if (!codec_->output_enabled()) {
-        esp_timer_stop(audio_power_timer_);
-        esp_timer_start_periodic(audio_power_timer_, AUDIO_POWER_CHECK_INTERVAL_MS * 1000);
-        codec_->EnableOutput(true);
-    }
-
-    int sample_rate = codec_->output_sample_rate();
-    int total_samples = sample_rate * duration_ms / 1000;
-    int half_period = sample_rate / (frequency_hz * 2);
-    if (half_period <= 0) {
-        half_period = 1;
-    }
-
-    ESP_LOGI(TAG, "Play diagnostic tone: %dHz %dms amp=%d sample_rate=%d",
-             frequency_hz, duration_ms, amplitude, sample_rate);
-    std::vector<int16_t> pcm;
-    pcm.reserve(sample_rate / 20);
-    int samples_written = 0;
-    while (samples_written < total_samples) {
-        int chunk_samples = std::min(sample_rate / 20, total_samples - samples_written);
-        pcm.resize(chunk_samples);
-        for (int i = 0; i < chunk_samples; ++i) {
-            int phase_sample = samples_written + i;
-            pcm[i] = ((phase_sample / half_period) & 1) ? amplitude : -amplitude;
-        }
-        codec_->OutputData(pcm);
-        samples_written += chunk_samples;
-    }
 }
 
 bool AudioService::IsIdle() {
