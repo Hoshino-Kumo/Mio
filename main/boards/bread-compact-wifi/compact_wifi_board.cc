@@ -49,6 +49,11 @@ private:
     }
 
     void InitializeSt7789Display() {
+        backlight_ = new PwmBacklight(LCD_BACKLIGHT_PIN, LCD_BACKLIGHT_OUTPUT_INVERT);
+        backlight_->SetBrightness(LCD_BACKLIGHT_DEFAULT_BRIGHTNESS);
+        ESP_LOGI(TAG, "LCD backlight on GPIO%d, invert=%d, brightness=%d",
+                 LCD_BACKLIGHT_PIN, LCD_BACKLIGHT_OUTPUT_INVERT, LCD_BACKLIGHT_DEFAULT_BRIGHTNESS);
+
         ESP_LOGI(TAG, "Initialize ST7789V SPI bus");
         spi_bus_config_t bus_config = {
             .mosi_io_num = LCD_SPI_MOSI_PIN,
@@ -111,8 +116,6 @@ private:
         display_ = new SpiLcdDisplay(panel_io_, panel_, DISPLAY_WIDTH, DISPLAY_HEIGHT,
                                      DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y,
                                      DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
-        backlight_ = new PwmBacklight(LCD_BACKLIGHT_PIN);
-        backlight_->RestoreBrightness();
     }
 
     void InitializeButtons() {

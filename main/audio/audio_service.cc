@@ -225,6 +225,25 @@ bool AudioService::ReadAudioData(std::vector<int16_t>& data, int sample_rate, in
     last_input_time_ = std::chrono::steady_clock::now();
     debug_statistics_.input_count++;
 
+    auto now = last_input_time_;
+    if (last_input_debug_time_.time_since_epoch().count() == 0 ||
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - last_input_debug_time_).count() >= 2000) {
+        int32_t peak = 0;
+        int64_t sum_abs = 0;
+        for (auto sample : data) {
+            int32_t value = sample;
+            int32_t abs_value = value < 0 ? -value : value;
+            if (abs_value > peak) {
+                peak = abs_value;
+            }
+            sum_abs += abs_value;
+        }
+        int32_t avg_abs = data.empty() ? 0 : static_cast<int32_t>(sum_abs / data.size());
+        ESP_LOGI(TAG, "Mic input samples=%u peak=%ld avg_abs=%ld",
+                 static_cast<unsigned>(data.size()), static_cast<long>(peak), static_cast<long>(avg_abs));
+        last_input_debug_time_ = now;
+    }
+
 #if CONFIG_USE_AUDIO_DEBUGGER
     // 音频调试：发送原始音频数据
     if (audio_debugger_ == nullptr) {

@@ -34,6 +34,8 @@
 #define LCD_RST_PIN        GPIO_NUM_8
 // Schematic net: IO4 -> PWM -> Q_BL -> LCD_BL_K.
 #define LCD_BACKLIGHT_PIN  GPIO_NUM_4
+#define LCD_BACKLIGHT_OUTPUT_INVERT false
+#define LCD_BACKLIGHT_DEFAULT_BRIGHTNESS 100
 #define LCD_PIXEL_CLOCK_HZ (40 * 1000 * 1000)
 
 #define DISPLAY_WIDTH        240
