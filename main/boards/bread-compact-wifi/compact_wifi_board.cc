@@ -1,53 +1,36 @@
 #include "wifi_board.h"
 #include "codecs/es8311_audio_codec.h"
-#include "display/oled_display.h"
+#include "display/lcd_display.h"
 #include "system_reset.h"
 #include "application.h"
 #include "button.h"
 #include "config.h"
 #include "mcp_server.h"
 #include "lamp_controller.h"
+#include "backlight.h"
 #include "led/single_led.h"
 #include "assets/lang_config.h"
 
 #include <esp_log.h>
 #include <driver/i2c_master.h>
+#include <driver/spi_master.h>
+#include <esp_lcd_io_spi.h>
 #include <esp_lcd_panel_ops.h>
-#include <esp_lcd_panel_vendor.h>
-
-#ifdef SH1106
-#include <esp_lcd_panel_sh1106.h>
-#endif
+#include <esp_lcd_panel_st7789.h>
 
 #define TAG "CompactWifiBoard"
 
 class CompactWifiBoard : public WifiBoard {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_ = nullptr;
-    i2c_master_bus_handle_t display_i2c_bus_;
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
     esp_lcd_panel_handle_t panel_ = nullptr;
     Display* display_ = nullptr;
+    Backlight* backlight_ = nullptr;
     Button boot_button_;
     Button touch_button_;
     Button volume_up_button_;
     Button volume_down_button_;
-
-    void InitializeDisplayI2c() {
-        i2c_master_bus_config_t bus_config = {
-            .i2c_port = (i2c_port_t)0,
-            .sda_io_num = DISPLAY_SDA_PIN,
-            .scl_io_num = DISPLAY_SCL_PIN,
-            .clk_source = I2C_CLK_SRC_DEFAULT,
-            .glitch_ignore_cnt = 7,
-            .intr_priority = 0,
-            .trans_queue_depth = 0,
-            .flags = {
-                .enable_internal_pullup = 1,
-            },
-        };
-        ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &display_i2c_bus_));
-    }
 
     void InitializeCodecI2c() {
         i2c_master_bus_config_t bus_config = {
@@ -65,56 +48,71 @@ private:
         ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &codec_i2c_bus_));
     }
 
-    void InitializeSsd1306Display() {
-        // SSD1306 config
-        esp_lcd_panel_io_i2c_config_t io_config = {
-            .dev_addr = 0x3C,
+    void InitializeSt7789Display() {
+        ESP_LOGI(TAG, "Initialize ST7789V SPI bus");
+        spi_bus_config_t bus_config = {
+            .mosi_io_num = LCD_SPI_MOSI_PIN,
+            .miso_io_num = GPIO_NUM_NC,
+            .sclk_io_num = LCD_SPI_SCLK_PIN,
+            .quadwp_io_num = GPIO_NUM_NC,
+            .quadhd_io_num = GPIO_NUM_NC,
+            .data4_io_num = GPIO_NUM_NC,
+            .data5_io_num = GPIO_NUM_NC,
+            .data6_io_num = GPIO_NUM_NC,
+            .data7_io_num = GPIO_NUM_NC,
+            .max_transfer_sz = DISPLAY_WIDTH * 80 * sizeof(uint16_t),
+            .flags = SPICOMMON_BUSFLAG_MASTER,
+            .isr_cpu_id = ESP_INTR_CPU_AFFINITY_AUTO,
+            .intr_flags = 0,
+        };
+        ESP_ERROR_CHECK(spi_bus_initialize(LCD_SPI_HOST, &bus_config, SPI_DMA_CH_AUTO));
+
+        ESP_LOGI(TAG, "Install ST7789V panel IO");
+        esp_lcd_panel_io_spi_config_t io_config = {
+            .cs_gpio_num = LCD_SPI_CS_PIN,
+            .dc_gpio_num = LCD_DC_PIN,
+            .spi_mode = 0,
+            .pclk_hz = LCD_PIXEL_CLOCK_HZ,
+            .trans_queue_depth = 10,
             .on_color_trans_done = nullptr,
             .user_ctx = nullptr,
-            .control_phase_bytes = 1,
-            .dc_bit_offset = 6,
             .lcd_cmd_bits = 8,
             .lcd_param_bits = 8,
+            .cs_ena_pretrans = 0,
+            .cs_ena_posttrans = 0,
+            .flags = {},
+        };
+        ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_SPI_HOST, &io_config, &panel_io_));
+
+        ESP_LOGI(TAG, "Install ST7789V panel driver");
+        esp_lcd_panel_dev_config_t panel_config = {
+            .reset_gpio_num = LCD_RST_PIN,
+            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+            .data_endian = LCD_RGB_DATA_ENDIAN_BIG,
+            .bits_per_pixel = 16,
             .flags = {
-                .dc_low_on_data = 0,
-                .disable_control_phase = 0,
+                .reset_active_high = 0,
             },
-            .scl_speed_hz = 400 * 1000,
+            .vendor_config = nullptr,
         };
+        ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(panel_io_, &panel_config, &panel_));
 
-        ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c_v2(display_i2c_bus_, &io_config, &panel_io_));
-
-        ESP_LOGI(TAG, "Install SSD1306 driver");
-        esp_lcd_panel_dev_config_t panel_config = {};
-        panel_config.reset_gpio_num = -1;
-        panel_config.bits_per_pixel = 1;
-
-        esp_lcd_panel_ssd1306_config_t ssd1306_config = {
-            .height = static_cast<uint8_t>(DISPLAY_HEIGHT),
-        };
-        panel_config.vendor_config = &ssd1306_config;
-
-#ifdef SH1106
-        ESP_ERROR_CHECK(esp_lcd_new_panel_sh1106(panel_io_, &panel_config, &panel_));
-#else
-        ESP_ERROR_CHECK(esp_lcd_new_panel_ssd1306(panel_io_, &panel_config, &panel_));
-#endif
-        ESP_LOGI(TAG, "SSD1306 driver installed");
-
-        // Reset the display
         ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_));
         if (esp_lcd_panel_init(panel_) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to initialize display");
+            ESP_LOGE(TAG, "Failed to initialize ST7789V display");
             display_ = new NoDisplay();
             return;
         }
-        ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel_, false));
 
-        // Set the display to on
-        ESP_LOGI(TAG, "Turning display on");
-        ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_, true));
+        ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel_, DISPLAY_INVERT_COLOR));
+        ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y));
+        ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel_, DISPLAY_SWAP_XY));
 
-        display_ = new OledDisplay(panel_io_, panel_, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
+        display_ = new SpiLcdDisplay(panel_io_, panel_, DISPLAY_WIDTH, DISPLAY_HEIGHT,
+                                     DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y,
+                                     DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
+        backlight_ = new PwmBacklight(LCD_BACKLIGHT_PIN);
+        backlight_->RestoreBrightness();
     }
 
     void InitializeButtons() {
@@ -126,16 +124,12 @@ private:
             }
             app.ToggleChatState();
         });
-        // Disable touch-triggered listening for now. On the current hardware this
-        // line is unstable during boot and can push the app into listening state
-        // immediately, which in turn keeps feeding AFE and floods the log.
-        // Re-enable after the touch input circuit and polarity are verified.
-        // touch_button_.OnPressDown([this]() {
-        //     Application::GetInstance().StartListening();
-        // });
-        // touch_button_.OnPressUp([this]() {
-        //     Application::GetInstance().StopListening();
-        // });
+        touch_button_.OnPressDown([this]() {
+            Application::GetInstance().StartListening();
+        });
+        touch_button_.OnPressUp([this]() {
+            Application::GetInstance().StopListening();
+        });
 
         volume_up_button_.OnClick([this]() {
             auto codec = GetAudioCodec();
@@ -180,8 +174,7 @@ public:
         volume_up_button_(VOLUME_UP_BUTTON_GPIO, false, 1000),
         volume_down_button_(VOLUME_DOWN_BUTTON_GPIO, false, 1000) {
         InitializeCodecI2c();
-        InitializeDisplayI2c();
-        InitializeSsd1306Display();
+        InitializeSt7789Display();
         InitializeButtons();
         InitializeTools();    
     }
@@ -211,6 +204,10 @@ public:
 
     virtual Display* GetDisplay() override {
         return display_;
+    }
+
+    virtual Backlight* GetBacklight() override {
+        return backlight_;
     }
 };
 

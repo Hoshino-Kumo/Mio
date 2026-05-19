@@ -17,8 +17,8 @@
 #define AUDIO_CODEC_I2C_SCL_PIN  GPIO_NUM_17
 #define AUDIO_CODEC_ES8311_ADDR  ES8311_CODEC_DEFAULT_ADDR
 
-// Set to 1 after the microphone input path is installed and validated.
-#define AUDIO_MICROPHONE_ENABLED 0
+// ES8311 microphone input path is enabled for validation.
+#define AUDIO_MICROPHONE_ENABLED 1
 
 #define BUILTIN_LED_GPIO        GPIO_NUM_48
 #define BOOT_BUTTON_GPIO        GPIO_NUM_0
@@ -26,23 +26,24 @@
 #define VOLUME_UP_BUTTON_GPIO   GPIO_NUM_40
 #define VOLUME_DOWN_BUTTON_GPIO GPIO_NUM_39
 
-#define DISPLAY_SDA_PIN GPIO_NUM_41
-#define DISPLAY_SCL_PIN GPIO_NUM_42
-#define DISPLAY_WIDTH   128
+#define LCD_SPI_HOST       SPI2_HOST
+#define LCD_SPI_SCLK_PIN   GPIO_NUM_12
+#define LCD_SPI_MOSI_PIN   GPIO_NUM_11
+#define LCD_SPI_CS_PIN     GPIO_NUM_10
+#define LCD_DC_PIN         GPIO_NUM_9
+#define LCD_RST_PIN        GPIO_NUM_8
+// Schematic net: IO4 -> PWM -> Q_BL -> LCD_BL_K.
+#define LCD_BACKLIGHT_PIN  GPIO_NUM_4
+#define LCD_PIXEL_CLOCK_HZ (40 * 1000 * 1000)
 
-#if CONFIG_OLED_SSD1306_128X32
-#define DISPLAY_HEIGHT  32
-#elif CONFIG_OLED_SSD1306_128X64
-#define DISPLAY_HEIGHT  64
-#elif CONFIG_OLED_SH1106_128X64
-#define DISPLAY_HEIGHT  64
-#define SH1106
-#else
-#error "OLED display type is not selected"
-#endif
-
-#define DISPLAY_MIRROR_X true
-#define DISPLAY_MIRROR_Y true
+#define DISPLAY_WIDTH        240
+#define DISPLAY_HEIGHT       320
+#define DISPLAY_OFFSET_X     0
+#define DISPLAY_OFFSET_Y     0
+#define DISPLAY_MIRROR_X     false
+#define DISPLAY_MIRROR_Y     false
+#define DISPLAY_SWAP_XY      false
+#define DISPLAY_INVERT_COLOR true
 
 
 // A MCP Test: Control a lamp
