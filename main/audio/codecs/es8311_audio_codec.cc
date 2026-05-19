@@ -99,7 +99,7 @@ void Es8311AudioCodec::UpdateDeviceState() {
             .sample_rate = (uint32_t)input_sample_rate_,
             .mclk_multiple = 0,
         };
-        ESP_LOGI(TAG, "Open ES8311: sample_rate=%d, i2s_channels=%d, channel_mask=0x%x, input_gain=%d dB",
+        ESP_LOGI(TAG, "Open ES8311: sample_rate=%d, i2s_channels=%d, channel_mask=0x%x, input_gain=%.1f dB",
                  input_sample_rate_, AUDIO_CODEC_INPUT_I2S_CHANNELS,
                  AUDIO_CODEC_INPUT_CHANNEL_MASK, input_gain_);
         ESP_ERROR_CHECK(esp_codec_dev_open(dev_, &fs));
