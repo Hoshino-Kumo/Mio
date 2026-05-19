@@ -3,6 +3,7 @@
 
 #include <esp_err.h>
 #include <esp_log.h>
+#include <esp_timer.h>
 
 #define TAG "Es8311AudioCodec"
 
@@ -114,6 +115,63 @@ void Es8311AudioCodec::UpdateDeviceState() {
     }
 }
 
+void Es8311AudioCodec::LogDiagnostics(const int16_t* data, int samples) {
+    int64_t now = esp_timer_get_time();
+    if (now - last_diagnostic_log_time_ < 5000000) {
+        return;
+    }
+    last_diagnostic_log_time_ = now;
+
+    int32_t peak = 0;
+    for (int i = 0; i < samples; ++i) {
+        int32_t value = data[i];
+        int32_t abs_value = value < 0 ? -value : value;
+        if (abs_value > peak) {
+            peak = abs_value;
+        }
+    }
+
+    int reg_fd = 0;
+    int reg_fe = 0;
+    int reg_ff = 0;
+    int reg_01 = 0;
+    int reg_09 = 0;
+    int reg_0a = 0;
+    int reg_0d = 0;
+    int reg_0e = 0;
+    int reg_12 = 0;
+    int reg_14 = 0;
+    int reg_15 = 0;
+    int reg_16 = 0;
+    int reg_17 = 0;
+    int reg_32 = 0;
+    int reg_44 = 0;
+
+    esp_codec_dev_read_reg(dev_, 0xfd, &reg_fd);
+    esp_codec_dev_read_reg(dev_, 0xfe, &reg_fe);
+    esp_codec_dev_read_reg(dev_, 0xff, &reg_ff);
+    esp_codec_dev_read_reg(dev_, 0x01, &reg_01);
+    esp_codec_dev_read_reg(dev_, 0x09, &reg_09);
+    esp_codec_dev_read_reg(dev_, 0x0a, &reg_0a);
+    esp_codec_dev_read_reg(dev_, 0x0d, &reg_0d);
+    esp_codec_dev_read_reg(dev_, 0x0e, &reg_0e);
+    esp_codec_dev_read_reg(dev_, 0x12, &reg_12);
+    esp_codec_dev_read_reg(dev_, 0x14, &reg_14);
+    esp_codec_dev_read_reg(dev_, 0x15, &reg_15);
+    esp_codec_dev_read_reg(dev_, 0x16, &reg_16);
+    esp_codec_dev_read_reg(dev_, 0x17, &reg_17);
+    esp_codec_dev_read_reg(dev_, 0x32, &reg_32);
+    esp_codec_dev_read_reg(dev_, 0x44, &reg_44);
+
+    ESP_LOGI(TAG, "ES8311 diag: id=%02x/%02x/%02x clk01=%02x sdp09=%02x sdp0a=%02x pwr0d=%02x pwr0e=%02x dac12=%02x sys14=%02x adc15=%02x gain16=%02x vol17=%02x dac32=%02x gpio44=%02x raw_peak=%ld first=[%d,%d,%d,%d,%d,%d,%d,%d]",
+             reg_fd, reg_fe, reg_ff, reg_01, reg_09, reg_0a, reg_0d, reg_0e, reg_12,
+             reg_14, reg_15, reg_16, reg_17, reg_32, reg_44, static_cast<long>(peak),
+             samples > 0 ? data[0] : 0, samples > 1 ? data[1] : 0,
+             samples > 2 ? data[2] : 0, samples > 3 ? data[3] : 0,
+             samples > 4 ? data[4] : 0, samples > 5 ? data[5] : 0,
+             samples > 6 ? data[6] : 0, samples > 7 ? data[7] : 0);
+}
+
 void Es8311AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din) {
     assert(input_sample_rate_ == output_sample_rate_);
 
@@ -211,6 +269,7 @@ int Es8311AudioCodec::Read(int16_t* dest, int samples) {
         ESP_LOGW(TAG, "Failed to read input data: %s", esp_err_to_name(ret));
         return 0;
     }
+    LogDiagnostics(dest, samples);
     return samples;
 }
 
