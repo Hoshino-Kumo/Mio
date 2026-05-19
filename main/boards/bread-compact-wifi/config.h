@@ -22,9 +22,9 @@
 #define AUDIO_CODEC_INPUT_GAIN_DB 42
 #define AUDIO_CODEC_I2S_BITS_PER_SAMPLE 16
 // ES8311 is physically mono, but the I2S peripheral exposes left/right slots.
-// The ADC data is on the left slot; the right slot may be DAC reference/empty.
+// The current board samples the ADC data from the right slot.
 #define AUDIO_CODEC_INPUT_I2S_CHANNELS 2
-#define AUDIO_CODEC_INPUT_CHANNEL_MASK ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0)
+#define AUDIO_CODEC_INPUT_CHANNEL_MASK ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1)
 
 #define BUILTIN_LED_GPIO        GPIO_NUM_48
 #define BOOT_BUTTON_GPIO        GPIO_NUM_0
