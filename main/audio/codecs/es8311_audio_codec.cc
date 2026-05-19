@@ -1,9 +1,22 @@
 #include "es8311_audio_codec.h"
+#include "config.h"
 
 #include <esp_err.h>
 #include <esp_log.h>
 
 #define TAG "Es8311AudioCodec"
+
+#ifndef AUDIO_CODEC_INPUT_GAIN_DB
+#define AUDIO_CODEC_INPUT_GAIN_DB 30
+#endif
+
+#ifndef AUDIO_CODEC_INPUT_I2S_CHANNELS
+#define AUDIO_CODEC_INPUT_I2S_CHANNELS 1
+#endif
+
+#ifndef AUDIO_CODEC_INPUT_CHANNEL_MASK
+#define AUDIO_CODEC_INPUT_CHANNEL_MASK 0
+#endif
 
 Es8311AudioCodec::Es8311AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port, int input_sample_rate, int output_sample_rate,
     gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din,
@@ -15,7 +28,7 @@ Es8311AudioCodec::Es8311AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port,
     output_sample_rate_ = output_sample_rate;
     pa_pin_ = pa_pin;
     pa_inverted_ = pa_inverted;
-    input_gain_ = 30;
+    input_gain_ = AUDIO_CODEC_INPUT_GAIN_DB;
 
     assert(input_sample_rate_ == output_sample_rate_);
     CreateDuplexChannels(mclk, bclk, ws, dout, din);
@@ -80,11 +93,14 @@ void Es8311AudioCodec::UpdateDeviceState() {
 
         esp_codec_dev_sample_info_t fs = {
             .bits_per_sample = 16,
-            .channel = 1,
-            .channel_mask = 0,
+            .channel = AUDIO_CODEC_INPUT_I2S_CHANNELS,
+            .channel_mask = AUDIO_CODEC_INPUT_CHANNEL_MASK,
             .sample_rate = (uint32_t)input_sample_rate_,
             .mclk_multiple = 0,
         };
+        ESP_LOGI(TAG, "Open ES8311: sample_rate=%d, i2s_channels=%d, channel_mask=0x%x, input_gain=%d dB",
+                 input_sample_rate_, AUDIO_CODEC_INPUT_I2S_CHANNELS,
+                 AUDIO_CODEC_INPUT_CHANNEL_MASK, input_gain_);
         ESP_ERROR_CHECK(esp_codec_dev_open(dev_, &fs));
         ESP_ERROR_CHECK(esp_codec_dev_set_in_gain(dev_, input_gain_));
         ESP_ERROR_CHECK(esp_codec_dev_set_out_vol(dev_, output_volume_));

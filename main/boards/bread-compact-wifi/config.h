@@ -19,6 +19,11 @@
 
 // ES8311 microphone input path is enabled for validation.
 #define AUDIO_MICROPHONE_ENABLED 1
+#define AUDIO_CODEC_INPUT_GAIN_DB 42
+// ES8311 is physically mono, but the I2S peripheral exposes left/right slots.
+// This board revision reads the ADC from the right slot.
+#define AUDIO_CODEC_INPUT_I2S_CHANNELS 2
+#define AUDIO_CODEC_INPUT_CHANNEL_MASK ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1)
 
 #define BUILTIN_LED_GPIO        GPIO_NUM_48
 #define BOOT_BUTTON_GPIO        GPIO_NUM_0
