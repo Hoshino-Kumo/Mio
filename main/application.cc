@@ -918,7 +918,11 @@ void Application::HandleStateChangedEvent() {
             display->ClearChatMessages();  // Clear messages first
             display->SetEmotion("neutral"); // Then set emotion (wechat mode checks child count)
             audio_service_.EnableVoiceProcessing(false);
-            audio_service_.EnableWakeWordDetection(true);
+            // This board currently runs without a stable microphone path, so keeping
+            // AFE wake word detection enabled in idle causes the FEED ringbuffer to
+            // overflow immediately on boot. Re-enable idle wake word after the mic
+            // hardware path is validated.
+            audio_service_.EnableWakeWordDetection(false);
             break;
         case kDeviceStateConnecting:
             display->SetStatus(Lang::Strings::CONNECTING);

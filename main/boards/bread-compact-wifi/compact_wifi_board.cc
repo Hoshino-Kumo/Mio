@@ -48,8 +48,26 @@ private:
         ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &codec_i2c_bus_));
     }
 
+    bool CheckDisplayStep(esp_err_t err, const char* step) {
+        if (err == ESP_OK) {
+            return true;
+        }
+        ESP_LOGE(TAG, "%s failed: %s", step, esp_err_to_name(err));
+        display_ = new NoDisplay();
+        if (backlight_ != nullptr) {
+            backlight_->SetBrightness(0);
+        }
+        return false;
+    }
+
     void InitializeSt7789Display() {
-        ESP_LOGI(TAG, "Initialize ST7789V SPI bus");
+        backlight_ = new PwmBacklight(LCD_BACKLIGHT_PIN, LCD_BACKLIGHT_OUTPUT_INVERT);
+        backlight_->SetBrightness(0);
+
+        ESP_LOGI(TAG, "Initialize ST7789V SPI LCD: sclk=%d mosi=%d cs=%d dc=%d rst=%d bl=%d",
+                 LCD_SPI_SCLK_PIN, LCD_SPI_MOSI_PIN, LCD_SPI_CS_PIN, LCD_DC_PIN,
+                 LCD_RST_PIN, LCD_BACKLIGHT_PIN);
+
         spi_bus_config_t bus_config = {
             .mosi_io_num = LCD_SPI_MOSI_PIN,
             .miso_io_num = GPIO_NUM_NC,
@@ -65,9 +83,10 @@ private:
             .isr_cpu_id = ESP_INTR_CPU_AFFINITY_AUTO,
             .intr_flags = 0,
         };
-        ESP_ERROR_CHECK(spi_bus_initialize(LCD_SPI_HOST, &bus_config, SPI_DMA_CH_AUTO));
+        if (!CheckDisplayStep(spi_bus_initialize(LCD_SPI_HOST, &bus_config, SPI_DMA_CH_AUTO), "spi_bus_initialize")) {
+            return;
+        }
 
-        ESP_LOGI(TAG, "Install ST7789V panel IO");
         esp_lcd_panel_io_spi_config_t io_config = {
             .cs_gpio_num = LCD_SPI_CS_PIN,
             .dc_gpio_num = LCD_DC_PIN,
@@ -82,9 +101,12 @@ private:
             .cs_ena_posttrans = 0,
             .flags = {},
         };
-        ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_SPI_HOST, &io_config, &panel_io_));
+        if (!CheckDisplayStep(esp_lcd_new_panel_io_spi(
+                reinterpret_cast<esp_lcd_spi_bus_handle_t>(LCD_SPI_HOST), &io_config, &panel_io_),
+                "esp_lcd_new_panel_io_spi")) {
+            return;
+        }
 
-        ESP_LOGI(TAG, "Install ST7789V panel driver");
         esp_lcd_panel_dev_config_t panel_config = {
             .reset_gpio_num = LCD_RST_PIN,
             .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
@@ -95,24 +117,30 @@ private:
             },
             .vendor_config = nullptr,
         };
-        ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(panel_io_, &panel_config, &panel_));
-
-        ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_));
-        if (esp_lcd_panel_init(panel_) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to initialize ST7789V display");
-            display_ = new NoDisplay();
+        if (!CheckDisplayStep(esp_lcd_new_panel_st7789(panel_io_, &panel_config, &panel_),
+                "esp_lcd_new_panel_st7789")) {
             return;
         }
-
-        ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel_, DISPLAY_INVERT_COLOR));
-        ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y));
-        ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel_, DISPLAY_SWAP_XY));
+        if (!CheckDisplayStep(esp_lcd_panel_reset(panel_), "esp_lcd_panel_reset")) {
+            return;
+        }
+        if (!CheckDisplayStep(esp_lcd_panel_init(panel_), "esp_lcd_panel_init")) {
+            return;
+        }
+        if (!CheckDisplayStep(esp_lcd_panel_invert_color(panel_, DISPLAY_INVERT_COLOR), "esp_lcd_panel_invert_color")) {
+            return;
+        }
+        if (!CheckDisplayStep(esp_lcd_panel_mirror(panel_, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y), "esp_lcd_panel_mirror")) {
+            return;
+        }
+        if (!CheckDisplayStep(esp_lcd_panel_swap_xy(panel_, DISPLAY_SWAP_XY), "esp_lcd_panel_swap_xy")) {
+            return;
+        }
 
         display_ = new SpiLcdDisplay(panel_io_, panel_, DISPLAY_WIDTH, DISPLAY_HEIGHT,
                                      DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y,
                                      DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
-        backlight_ = new PwmBacklight(LCD_BACKLIGHT_PIN);
-        backlight_->RestoreBrightness();
+        backlight_->SetBrightness(LCD_BACKLIGHT_DEFAULT_BRIGHTNESS);
     }
 
     void InitializeButtons() {
@@ -124,12 +152,16 @@ private:
             }
             app.ToggleChatState();
         });
-        touch_button_.OnPressDown([this]() {
-            Application::GetInstance().StartListening();
-        });
-        touch_button_.OnPressUp([this]() {
-            Application::GetInstance().StopListening();
-        });
+        // Disable touch-triggered listening for now. On the current hardware this
+        // line is unstable during boot and can push the app into listening state
+        // immediately, which in turn keeps feeding AFE and floods the log.
+        // Re-enable after the touch input circuit and polarity are verified.
+        // touch_button_.OnPressDown([this]() {
+        //     Application::GetInstance().StartListening();
+        // });
+        // touch_button_.OnPressUp([this]() {
+        //     Application::GetInstance().StopListening();
+        // });
 
         volume_up_button_.OnClick([this]() {
             auto codec = GetAudioCodec();

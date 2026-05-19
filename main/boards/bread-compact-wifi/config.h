@@ -17,8 +17,8 @@
 #define AUDIO_CODEC_I2C_SCL_PIN  GPIO_NUM_17
 #define AUDIO_CODEC_ES8311_ADDR  ES8311_CODEC_DEFAULT_ADDR
 
-// ES8311 microphone input path is enabled for validation.
-#define AUDIO_MICROPHONE_ENABLED 1
+// Set to 1 after the microphone input path is installed and validated.
+#define AUDIO_MICROPHONE_ENABLED 0
 
 #define BUILTIN_LED_GPIO        GPIO_NUM_48
 #define BOOT_BUTTON_GPIO        GPIO_NUM_0
@@ -32,9 +32,10 @@
 #define LCD_SPI_CS_PIN     GPIO_NUM_10
 #define LCD_DC_PIN         GPIO_NUM_9
 #define LCD_RST_PIN        GPIO_NUM_8
-// Schematic net: IO4 -> PWM -> Q_BL -> LCD_BL_K.
 #define LCD_BACKLIGHT_PIN  GPIO_NUM_4
-#define LCD_PIXEL_CLOCK_HZ (40 * 1000 * 1000)
+#define LCD_BACKLIGHT_OUTPUT_INVERT false
+#define LCD_BACKLIGHT_DEFAULT_BRIGHTNESS 80
+#define LCD_PIXEL_CLOCK_HZ (20 * 1000 * 1000)
 
 #define DISPLAY_WIDTH        240
 #define DISPLAY_HEIGHT       320

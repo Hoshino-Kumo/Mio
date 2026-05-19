@@ -29,9 +29,9 @@
   - DC `GPIO9`
   - RST `GPIO8`
   - BLK PWM `GPIO4` through Q_BL, per schematic netlist
-- Microphone input is enabled for validation:
-  - `AUDIO_MICROPHONE_ENABLED 1`
-  - Idle wake word detection is enabled.
+- Microphone input is intentionally disabled for now:
+  - `AUDIO_MICROPHONE_ENABLED 0`
+  - Re-enable only after the microphone path is physically installed and validated.
 
 ## Recent Important Changes
 
@@ -42,9 +42,9 @@
 
 ## Known Current Behavior
 
-- Wake word detection is enabled in idle mode.
-- Touch button press/release starts/stops listening.
-- Manual listening can also be entered through the remaining button/chat control path.
+- Wake word detection is intentionally disabled in idle mode.
+- Touch button no longer starts/stops listening.
+- Manual listening should still be entered through the remaining button/chat control path.
 - Streaming audio playback should remain in speaking/media state until queued audio has played or the stream is aborted.
 
 ## Common Commands
@@ -59,6 +59,6 @@ idf.py build
 
 ## Next Debug Targets
 
-- Validate ES8311 microphone input through wake word, touch-triggered listening, and audio testing.
-- If `AFE(FEED) is full` appears with `AUDIO_MICROPHONE_ENABLED 1`, inspect the ES8311 input data rate/channel count, touch input stability, and AFE feed chunk handling.
+- If `AFE(FEED) is full` still appears with `AUDIO_MICROPHONE_ENABLED 0`, search for any code path that feeds AFE without going through `AudioService::ReadAudioData()`.
+- After installing the microphone, set `AUDIO_MICROPHONE_ENABLED` to `1`, then validate ES8311 input before re-enabling idle wake word detection.
 - If streaming playback still cannot be interrupted, inspect `Application::AbortSpeaking()`, `media_streaming_`, and `AudioService::ResetDecoder()`.
