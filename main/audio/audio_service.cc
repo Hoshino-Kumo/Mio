@@ -659,6 +659,7 @@ void AudioService::SetCallbacks(AudioServiceCallbacks& callbacks) {
 }
 
 void AudioService::PlaySound(const std::string_view& ogg) {
+    ESP_LOGI(TAG, "Play sound: %u bytes", static_cast<unsigned>(ogg.size()));
     if (!codec_->output_enabled()) {
         esp_timer_stop(audio_power_timer_);
         esp_timer_start_periodic(audio_power_timer_, AUDIO_POWER_CHECK_INTERVAL_MS * 1000);
@@ -679,6 +680,40 @@ void AudioService::PlaySound(const std::string_view& ogg) {
     });
     demuxer->Reset();
     demuxer->Process(buf, size);
+}
+
+void AudioService::PlayDiagnosticTone(int frequency_hz, int duration_ms, int amplitude) {
+    if (codec_ == nullptr || frequency_hz <= 0 || duration_ms <= 0 || amplitude <= 0) {
+        return;
+    }
+    if (!codec_->output_enabled()) {
+        esp_timer_stop(audio_power_timer_);
+        esp_timer_start_periodic(audio_power_timer_, AUDIO_POWER_CHECK_INTERVAL_MS * 1000);
+        codec_->EnableOutput(true);
+    }
+
+    int sample_rate = codec_->output_sample_rate();
+    int total_samples = sample_rate * duration_ms / 1000;
+    int half_period = sample_rate / (frequency_hz * 2);
+    if (half_period <= 0) {
+        half_period = 1;
+    }
+
+    ESP_LOGI(TAG, "Play diagnostic tone: %dHz %dms amp=%d sample_rate=%d",
+             frequency_hz, duration_ms, amplitude, sample_rate);
+    std::vector<int16_t> pcm;
+    pcm.reserve(sample_rate / 20);
+    int samples_written = 0;
+    while (samples_written < total_samples) {
+        int chunk_samples = std::min(sample_rate / 20, total_samples - samples_written);
+        pcm.resize(chunk_samples);
+        for (int i = 0; i < chunk_samples; ++i) {
+            int phase_sample = samples_written + i;
+            pcm[i] = ((phase_sample / half_period) & 1) ? amplitude : -amplitude;
+        }
+        codec_->OutputData(pcm);
+        samples_written += chunk_samples;
+    }
 }
 
 bool AudioService::IsIdle() {
