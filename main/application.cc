@@ -74,7 +74,6 @@ void Application::Initialize() {
     auto codec = board.GetAudioCodec();
     audio_service_.Initialize(codec);
     audio_service_.Start();
-    audio_service_.PlayDiagnosticTone();
 
     AudioServiceCallbacks callbacks;
     callbacks.on_send_queue_available = [this]() {
