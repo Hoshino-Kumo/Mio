@@ -102,7 +102,7 @@ private:
             .flags = {},
         };
         if (!CheckDisplayStep(esp_lcd_new_panel_io_spi(
-                reinterpret_cast<esp_lcd_spi_bus_handle_t>(LCD_SPI_HOST), &io_config, &panel_io_),
+                static_cast<esp_lcd_spi_bus_handle_t>(LCD_SPI_HOST), &io_config, &panel_io_),
                 "esp_lcd_new_panel_io_spi")) {
             return;
         }
