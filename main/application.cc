@@ -929,6 +929,10 @@ void Application::HandleStateChangedEvent() {
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
 
+#ifndef CONFIG_WAKE_WORD_DETECTION_IN_LISTENING
+            audio_service_.EnableWakeWordDetection(false);
+#endif
+
             // Make sure the audio processor is running
             if (play_popup_on_listening_ || !audio_service_.IsAudioProcessorRunning()) {
                 // For auto mode, wait for playback queue to be empty before enabling voice processing
@@ -945,9 +949,6 @@ void Application::HandleStateChangedEvent() {
 #ifdef CONFIG_WAKE_WORD_DETECTION_IN_LISTENING
             // Enable wake word detection in listening mode (configured via Kconfig)
             audio_service_.EnableWakeWordDetection(audio_service_.IsAfeWakeWord());
-#else
-            // Disable wake word detection in listening mode
-            audio_service_.EnableWakeWordDetection(false);
 #endif
             
             // Play popup sound after ResetDecoder (in EnableVoiceProcessing) has been called

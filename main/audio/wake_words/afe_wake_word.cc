@@ -142,8 +142,11 @@ void AfeWakeWord::AudioDetectionTask() {
         xEventGroupWaitBits(event_group_, DETECTION_RUNNING_EVENT, pdFALSE, pdTRUE, portMAX_DELAY);
 
         auto res = afe_iface_->fetch_with_delay(afe_data_, portMAX_DELAY);
+        if (!(xEventGroupGetBits(event_group_) & DETECTION_RUNNING_EVENT)) {
+            continue;
+        }
         if (res == nullptr || res->ret_value == ESP_FAIL) {
-            continue;;
+            continue;
         }
 
         // Store the wake word data for voice recognition, like who is speaking
