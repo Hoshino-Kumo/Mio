@@ -1,6 +1,5 @@
 #include "es8311_audio_codec.h"
 
-#include <esp_err.h>
 #include <esp_log.h>
 
 #define TAG "Es8311AudioCodec"
@@ -186,14 +185,8 @@ void Es8311AudioCodec::EnableOutput(bool enable) {
 }
 
 int Es8311AudioCodec::Read(int16_t* dest, int samples) {
-    if (!input_enabled_ || dev_ == nullptr) {
-        return 0;
-    }
-
-    auto ret = esp_codec_dev_read(dev_, (void*)dest, samples * sizeof(int16_t));
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to read input data: %s", esp_err_to_name(ret));
-        return 0;
+    if (input_enabled_) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_read(dev_, (void*)dest, samples * sizeof(int16_t)));
     }
     return samples;
 }
