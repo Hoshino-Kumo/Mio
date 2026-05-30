@@ -31,6 +31,14 @@ protected:
     lv_obj_t* emoji_image_ = nullptr;
     std::unique_ptr<LvglGif> gif_controller_ = nullptr;
     lv_obj_t* emoji_box_ = nullptr;
+    lv_obj_t* robot_scene_ = nullptr;
+    lv_obj_t* robot_face_ = nullptr;
+    lv_obj_t* robot_eye_left_ = nullptr;
+    lv_obj_t* robot_eye_right_ = nullptr;
+    lv_obj_t* robot_mouth_ = nullptr;
+    lv_obj_t* robot_cheek_left_ = nullptr;
+    lv_obj_t* robot_cheek_right_ = nullptr;
+    lv_obj_t* robot_status_dot_ = nullptr;
     lv_obj_t* chat_message_label_ = nullptr;
     esp_timer_handle_t preview_timer_ = nullptr;
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;
@@ -46,11 +54,15 @@ protected:
     
 public:
     ~LcdDisplay();
+    virtual void SetStatus(const char* status) override;
+    virtual void ShowNotification(const char* notification, int duration_ms = 3000) override;
+    virtual void ShowNotification(const std::string& notification, int duration_ms = 3000) override;
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetChatMessage(const char* role, const char* content) override;
     virtual void ClearChatMessages() override;
     virtual void SetPreviewImage(std::unique_ptr<LvglImage> image) override;
     virtual void SetupUI() override;
+    virtual void UpdateStatusBar(bool update_all = false) override;
     // Add theme switching function
     virtual void SetTheme(Theme* theme) override;
     

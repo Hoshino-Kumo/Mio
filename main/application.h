@@ -140,6 +140,7 @@ private:
 
     bool has_server_time_ = false;
     bool aborted_ = false;
+    std::atomic<bool> tts_streaming_{false};
     std::atomic<bool> media_streaming_{false};
     bool assets_version_checked_ = false;
     bool play_popup_on_listening_ = false;  // Flag to play popup sound after state changes to listening

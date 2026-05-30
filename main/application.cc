@@ -11,6 +11,7 @@
 #include "settings.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <thread>
 #include <esp_log.h>
@@ -513,6 +514,7 @@ void Application::InitializeProtocol() {
     
     protocol_->OnAudioChannelClosed([this, &board]() {
         board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
+        tts_streaming_.store(false);
         Schedule([this]() {
             auto display = Board::GetInstance().GetDisplay();
             display->SetChatMessage("system", "");
@@ -526,6 +528,7 @@ void Application::InitializeProtocol() {
         if (strcmp(type->valuestring, "tts") == 0) {
             auto state = cJSON_GetObjectItem(root, "state");
             if (strcmp(state->valuestring, "start") == 0) {
+                tts_streaming_.store(true);
                 Schedule([this]() {
                     if (media_streaming_.load()) {
                         ESP_LOGI(TAG, "Ignore TTS start while media streaming");
@@ -535,11 +538,13 @@ void Application::InitializeProtocol() {
                     SetDeviceState(kDeviceStateSpeaking);
                 });
             } else if (strcmp(state->valuestring, "stop") == 0) {
+                tts_streaming_.store(false);
                 Schedule([this]() {
                     if (media_streaming_.load()) {
                         ESP_LOGI(TAG, "Ignore TTS stop while media streaming");
                         return;
                     }
+                    audio_service_.WaitForPlaybackQueueEmpty();
                     if (GetDeviceState() == kDeviceStateSpeaking) {
                         if (listening_mode_ == kListeningModeManualStop) {
                             SetDeviceState(kDeviceStateIdle);
@@ -988,6 +993,7 @@ void Application::Schedule(std::function<void()>&& callback) {
 void Application::AbortSpeaking(AbortReason reason) {
     ESP_LOGI(TAG, "Abort speaking");
     aborted_ = true;
+    tts_streaming_.store(false);
     if (media_streaming_.load()) {
         media_streaming_.store(false);
         audio_service_.ResetDecoder();
@@ -1191,6 +1197,15 @@ void Application::PlayAudioUrl(const std::string& url, const std::string& song_n
     });
 
     std::thread([this, url, meta, display]() {
+        while (media_streaming_.load() && tts_streaming_.load()) {
+            audio_service_.WaitForPlaybackQueueEmpty();
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        audio_service_.WaitForPlaybackQueueEmpty();
+        if (!media_streaming_.load()) {
+            return;
+        }
+
         auto http = Board::GetInstance().GetNetwork()->CreateHttp(3);
         if (!http->Open("GET", url)) {
             ESP_LOGE(TAG, "Failed to open audio URL: %s", url.c_str());

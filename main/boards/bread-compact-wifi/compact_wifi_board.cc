@@ -17,6 +17,11 @@
 #include <esp_lcd_io_spi.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_st7789.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
+#include <algorithm>
+#include <vector>
 
 #define TAG "CompactWifiBoard"
 
@@ -60,13 +65,54 @@ private:
         return false;
     }
 
+    bool TurnDisplayOn() {
+        esp_err_t err = esp_lcd_panel_disp_on_off(panel_, true);
+        if (err == ESP_ERR_NOT_SUPPORTED) {
+            ESP_LOGW(TAG, "esp_lcd_panel_disp_on_off is not supported; assuming display is on");
+            return true;
+        }
+        return CheckDisplayStep(err, "esp_lcd_panel_disp_on_off");
+    }
+
+    bool DrawDisplayProbePattern() {
+        ESP_LOGI(TAG, "Draw ST7789 probe pattern");
+
+        std::vector<uint16_t> line(DISPLAY_WIDTH);
+        const uint16_t colors[] = {
+            0xF800, // red
+            0x07E0, // green
+            0x001F, // blue
+            0xFFFF, // white
+        };
+        const int band_height = DISPLAY_HEIGHT / 4;
+
+        for (int band = 0; band < 4; ++band) {
+            std::fill(line.begin(), line.end(), colors[band]);
+            int y_start = band * band_height;
+            int y_end = (band == 3) ? DISPLAY_HEIGHT : y_start + band_height;
+            for (int y = y_start; y < y_end; ++y) {
+                if (!CheckDisplayStep(
+                        esp_lcd_panel_draw_bitmap(panel_, 0, y, DISPLAY_WIDTH, y + 1, line.data()),
+                        "esp_lcd_panel_draw_bitmap")) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     void InitializeSt7789Display() {
-        backlight_ = new PwmBacklight(LCD_BACKLIGHT_PIN, LCD_BACKLIGHT_OUTPUT_INVERT);
+#if LCD_BACKLIGHT_USE_PWM
+        backlight_ = new PwmBacklight(LCD_BACKLIGHT_PIN, LCD_BACKLIGHT_OUTPUT_INVERT, LCD_BACKLIGHT_PWM_FREQ_HZ);
+#else
+        backlight_ = new GpioBacklight(LCD_BACKLIGHT_PIN, LCD_BACKLIGHT_OUTPUT_INVERT);
+#endif
         backlight_->SetBrightness(0);
 
-        ESP_LOGI(TAG, "Initialize ST7789V SPI LCD: sclk=%d mosi=%d cs=%d dc=%d rst=%d bl=%d",
+        ESP_LOGI(TAG, "Initialize ST7789V SPI LCD: sclk=%d mosi=%d cs=%d dc=%d rst=%d bl=%d pclk=%d",
                  LCD_SPI_SCLK_PIN, LCD_SPI_MOSI_PIN, LCD_SPI_CS_PIN, LCD_DC_PIN,
-                 LCD_RST_PIN, LCD_BACKLIGHT_PIN);
+                 LCD_RST_PIN, LCD_BACKLIGHT_PIN, LCD_PIXEL_CLOCK_HZ);
 
         spi_bus_config_t bus_config = {
             .mosi_io_num = LCD_SPI_MOSI_PIN,
@@ -136,11 +182,19 @@ private:
         if (!CheckDisplayStep(esp_lcd_panel_swap_xy(panel_, DISPLAY_SWAP_XY), "esp_lcd_panel_swap_xy")) {
             return;
         }
+        if (!TurnDisplayOn()) {
+            return;
+        }
+        backlight_->SetBrightness(LCD_BACKLIGHT_DEFAULT_BRIGHTNESS);
+        vTaskDelay(pdMS_TO_TICKS(120));
+        if (!DrawDisplayProbePattern()) {
+            return;
+        }
+        vTaskDelay(pdMS_TO_TICKS(120));
 
         display_ = new SpiLcdDisplay(panel_io_, panel_, DISPLAY_WIDTH, DISPLAY_HEIGHT,
                                      DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y,
                                      DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
-        backlight_->SetBrightness(LCD_BACKLIGHT_DEFAULT_BRIGHTNESS);
     }
 
     void InitializeButtons() {

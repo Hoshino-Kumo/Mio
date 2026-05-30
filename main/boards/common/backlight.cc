@@ -81,13 +81,37 @@ void Backlight::OnTransitionTimer() {
     }
 }
 
+GpioBacklight::GpioBacklight(gpio_num_t pin, bool output_invert) : Backlight(), pin_(pin), output_invert_(output_invert) {
+    gpio_config_t config = {
+        .pin_bit_mask = 1ULL << pin_,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&config));
+    SetBrightnessImpl(0);
+}
+
+GpioBacklight::~GpioBacklight() {
+    SetBrightnessImpl(0);
+}
+
+void GpioBacklight::SetBrightnessImpl(uint8_t brightness) {
+    int level = brightness > 0 ? 1 : 0;
+    if (output_invert_) {
+        level = !level;
+    }
+    gpio_set_level(pin_, level);
+}
+
 PwmBacklight::PwmBacklight(gpio_num_t pin, bool output_invert, uint32_t freq_hz) : Backlight() {
     const ledc_timer_config_t backlight_timer = {
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_10_BIT,
         .timer_num = LEDC_TIMER_0,
         .freq_hz = freq_hz, //背光pwm频率需要高一点，防止电感啸叫
-        .clk_cfg = LEDC_AUTO_CLK,
+        .clk_cfg = LEDC_USE_APB_CLK,
         .deconfigure = false
     };
     ESP_ERROR_CHECK(ledc_timer_config(&backlight_timer));
@@ -118,4 +142,3 @@ void PwmBacklight::SetBrightnessImpl(uint8_t brightness) {
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty_cycle);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 }
-

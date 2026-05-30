@@ -1,10 +1,24 @@
 #include "es8311_audio_codec.h"
 
+#include "config.h"
+
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_timer.h>
 
 #define TAG "Es8311AudioCodec"
+
+#ifndef AUDIO_CODEC_PA_VOLTAGE
+#define AUDIO_CODEC_PA_VOLTAGE 5.0f
+#endif
+
+#ifndef AUDIO_CODEC_DAC_VOLTAGE
+#define AUDIO_CODEC_DAC_VOLTAGE 3.3f
+#endif
+
+#ifndef AUDIO_CODEC_PA_GAIN_DB
+#define AUDIO_CODEC_PA_GAIN_DB 0.0f
+#endif
 
 Es8311AudioCodec::Es8311AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port, int input_sample_rate, int output_sample_rate,
     gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din,
@@ -48,8 +62,9 @@ Es8311AudioCodec::Es8311AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port,
     es8311_cfg.codec_mode = ESP_CODEC_DEV_WORK_MODE_BOTH;
     es8311_cfg.pa_pin = pa_pin;
     es8311_cfg.use_mclk = use_mclk;
-    es8311_cfg.hw_gain.pa_voltage = 5.0;
-    es8311_cfg.hw_gain.codec_dac_voltage = 3.3;
+    es8311_cfg.hw_gain.pa_voltage = AUDIO_CODEC_PA_VOLTAGE;
+    es8311_cfg.hw_gain.codec_dac_voltage = AUDIO_CODEC_DAC_VOLTAGE;
+    es8311_cfg.hw_gain.pa_gain = AUDIO_CODEC_PA_GAIN_DB;
     es8311_cfg.pa_reverted = pa_inverted_;
     codec_if_ = es8311_codec_new(&es8311_cfg);
 
@@ -184,6 +199,9 @@ void Es8311AudioCodec::EnableOutput(bool enable) {
     }
     AudioCodec::EnableOutput(enable);
     UpdateDeviceState();
+    if (dev_ != nullptr) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_set_out_vol(dev_, enable ? output_volume_ : 0));
+    }
 }
 
 int Es8311AudioCodec::Read(int16_t* dest, int samples) {

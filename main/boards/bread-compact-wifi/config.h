@@ -16,6 +16,11 @@
 #define AUDIO_CODEC_I2C_SDA_PIN  GPIO_NUM_18
 #define AUDIO_CODEC_I2C_SCL_PIN  GPIO_NUM_17
 #define AUDIO_CODEC_ES8311_ADDR  ES8311_CODEC_DEFAULT_ADDR
+#define AUDIO_CODEC_PA_VOLTAGE      4.5f
+#define AUDIO_CODEC_DAC_VOLTAGE     3.3f
+// NS4150B input resistors are 100k. Keep this at 0 so codec volume does not
+// attenuate the ES8311 DAC output to compensate for external amp gain.
+#define AUDIO_CODEC_PA_GAIN_DB      0.0f
 
 #define BUILTIN_LED_GPIO        GPIO_NUM_48
 #define BOOT_BUTTON_GPIO        GPIO_NUM_0
@@ -31,17 +36,19 @@
 #define LCD_RST_PIN        GPIO_NUM_8
 #define LCD_BACKLIGHT_PIN  GPIO_NUM_4
 #define LCD_BACKLIGHT_OUTPUT_INVERT false
+#define LCD_BACKLIGHT_USE_PWM true
+#define LCD_BACKLIGHT_PWM_FREQ_HZ 40000
 #define LCD_BACKLIGHT_DEFAULT_BRIGHTNESS 80
 #define LCD_PIXEL_CLOCK_HZ (20 * 1000 * 1000)
 
-#define DISPLAY_WIDTH        240
-#define DISPLAY_HEIGHT       320
+#define DISPLAY_WIDTH        320
+#define DISPLAY_HEIGHT       240
 #define DISPLAY_OFFSET_X     0
 #define DISPLAY_OFFSET_Y     0
 #define DISPLAY_MIRROR_X     false
-#define DISPLAY_MIRROR_Y     false
-#define DISPLAY_SWAP_XY      false
-#define DISPLAY_INVERT_COLOR true
+#define DISPLAY_MIRROR_Y     true
+#define DISPLAY_SWAP_XY      true
+#define DISPLAY_INVERT_COLOR false
 
 
 // A MCP Test: Control a lamp

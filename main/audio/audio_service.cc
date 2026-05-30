@@ -178,6 +178,7 @@ void AudioService::Stop() {
     audio_decode_queue_.clear();
     audio_playback_queue_.clear();
     audio_testing_queue_.clear();
+    playback_active_ = false;
     audio_queue_cv_.notify_all();
 }
 
@@ -297,6 +298,7 @@ void AudioService::AudioOutputTask() {
 
         auto task = std::move(audio_playback_queue_.front());
         audio_playback_queue_.pop_front();
+        playback_active_ = true;
         audio_queue_cv_.notify_all();
         lock.unlock();
 
@@ -312,13 +314,15 @@ void AudioService::AudioOutputTask() {
         last_output_time_ = std::chrono::steady_clock::now();
         debug_statistics_.playback_count++;
 
+        lock.lock();
 #if CONFIG_USE_SERVER_AEC
         /* Record the timestamp for server AEC */
         if (task->timestamp > 0) {
-            lock.lock();
             timestamp_queue_.push_back(task->timestamp);
         }
 #endif
+        playback_active_ = false;
+        audio_queue_cv_.notify_all();
     }
 
     ESP_LOGW(TAG, "Audio output task stopped");
@@ -655,13 +659,14 @@ void AudioService::PlaySound(const std::string_view& ogg) {
 
 bool AudioService::IsIdle() {
     std::lock_guard<std::mutex> lock(audio_queue_mutex_);
-    return audio_encode_queue_.empty() && audio_decode_queue_.empty() && audio_playback_queue_.empty() && audio_testing_queue_.empty();
+    return !playback_active_ && audio_encode_queue_.empty() && audio_decode_queue_.empty() &&
+        audio_playback_queue_.empty() && audio_testing_queue_.empty();
 }
 
 void AudioService::WaitForPlaybackQueueEmpty() {
     std::unique_lock<std::mutex> lock(audio_queue_mutex_);
     audio_queue_cv_.wait(lock, [this]() { 
-        return service_stopped_ || (audio_decode_queue_.empty() && audio_playback_queue_.empty()); 
+        return service_stopped_ || (audio_decode_queue_.empty() && audio_playback_queue_.empty() && !playback_active_);
     });
 }
 
